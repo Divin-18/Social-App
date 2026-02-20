@@ -1,14 +1,14 @@
+import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -16,13 +16,21 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(
+    null,
+  );
   const { signIn } = useAuth();
 
   const router = useRouter();
 
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+  const hideModal = () => setModal(null);
+
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+      showModal("Error", "Please fill in all fields");
+      return;
     }
 
     setIsLoading(true);
@@ -31,11 +39,12 @@ export default function LoginScreen() {
       router.push("/(tabs)");
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to sign in. Please try again.");
+      showModal("Error", "Failed to sign in. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
       <View style={styles.content}>
@@ -81,6 +90,15 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ""}
+        message={modal?.message ?? ""}
+        infoOnly
+        onCancel={hideModal}
+        onConfirm={hideModal}
+      />
     </SafeAreaView>
   );
 }

@@ -1,14 +1,14 @@
+import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -16,17 +16,26 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(
+    null,
+  );
 
   const router = useRouter();
   const { signUp } = useAuth();
 
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+  const hideModal = () => setModal(null);
+
   const handleSignUp = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+      showModal("Error", "Please fill in all fields");
+      return;
     }
 
     if (password.length < 3) {
-      Alert.alert("Error", "Password must be at least 3 characters");
+      showModal("Error", "Password must be at least 3 characters");
+      return;
     }
 
     setIsLoading(true);
@@ -35,7 +44,7 @@ export default function SignUpScreen() {
       router.push("/(auth)/onboarding");
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to sign up. Please try again.");
+      showModal("Error", "Failed to sign up. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -86,6 +95,15 @@ export default function SignUpScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ""}
+        message={modal?.message ?? ""}
+        infoOnly
+        onCancel={hideModal}
+        onConfirm={hideModal}
+      />
     </SafeAreaView>
   );
 }

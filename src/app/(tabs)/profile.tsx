@@ -6,12 +6,11 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -21,13 +20,21 @@ export default function Profile() {
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const router = useRouter();
 
+  // Generic info/error modal
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(
+    null,
+  );
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+  const hideModal = () => setModal(null);
+
   const handleUpdateProfileImage = async () => {
     if (!user) return;
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
-      Alert.alert(
+      showModal(
         "Permission needed",
         "We need camera roll permissions to select a profile image.",
       );
@@ -50,13 +57,10 @@ export default function Profile() {
         );
 
         await updateUser({ profileImage: imageUrl });
-        Alert.alert("Success", "Profile image updated.");
+        showModal("Success", "Profile image updated.");
       } catch (error) {
         console.error("Error updating profile image:", error);
-        Alert.alert(
-          "Error",
-          "Failed to update profile image. Please try again.",
-        );
+        showModal("Error", "Failed to update profile image. Please try again.");
       } finally {
         setIsUpdating(false);
       }
@@ -155,6 +159,7 @@ export default function Profile() {
         </View>
       </ScrollView>
 
+      {/* Sign out confirmation */}
       <ConfirmModal
         visible={showSignOutModal}
         title="Sign Out"
@@ -166,6 +171,16 @@ export default function Profile() {
           await signOut();
           router.replace("/(auth)/login");
         }}
+      />
+
+      {/* Info / error modal */}
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ""}
+        message={modal?.message ?? ""}
+        infoOnly
+        onCancel={hideModal}
+        onConfirm={hideModal}
       />
     </SafeAreaView>
   );

@@ -17,6 +17,8 @@ type ConfirmModalProps = {
   confirmText?: string;
   cancelText?: string;
   loading?: boolean;
+  /** When true, only shows the confirm button (acts as a simple alert/info dialog) */
+  infoOnly?: boolean;
 };
 
 export default function ConfirmModal({
@@ -25,9 +27,10 @@ export default function ConfirmModal({
   message,
   onCancel,
   onConfirm,
-  confirmText = "Confirm",
+  confirmText = "OK",
   cancelText = "Cancel",
   loading = false,
+  infoOnly = false,
 }: ConfirmModalProps) {
   return (
     <Modal
@@ -41,14 +44,16 @@ export default function ConfirmModal({
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={onCancel}
-              disabled={loading}
-            >
-              <Text style={styles.cancelText}>{cancelText}</Text>
-            </TouchableOpacity>
+          <View style={[styles.buttonRow, infoOnly && styles.buttonRowCenter]}>
+            {!infoOnly && (
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={onCancel}
+                disabled={loading}
+              >
+                <Text style={styles.cancelText}>{cancelText}</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[styles.button, styles.confirmButton]}
@@ -98,6 +103,9 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
+  },
+  buttonRowCenter: {
+    justifyContent: "center",
   },
   button: {
     paddingVertical: 10,

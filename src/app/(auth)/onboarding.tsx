@@ -1,20 +1,20 @@
+import ConfirmModal from "@/components/ConfirmModal";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase/client";
+import { uploadProfileImage } from "@/lib/supabase/storage";
+import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
+  View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Image } from "expo-image";
-import { supabase } from "@/lib/supabase/client";
-import { uploadProfileImage } from "@/lib/supabase/storage";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "expo-router";
 
 export default function SignUpScreen() {
   const [name, setName] = useState("");
@@ -24,10 +24,22 @@ export default function SignUpScreen() {
   const { user, updateUser } = useAuth();
   const router = useRouter();
 
+  // Generic info/error modal
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(
+    null,
+  );
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+  const hideModal = () => setModal(null);
+
+  // Image picker choice modal
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+
   const pickImage = async () => {
+    setShowImagePickerModal(false);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showModal(
         "Permission needed",
         "We need camera roll permissions to select a profile image.",
       );
@@ -46,9 +58,10 @@ export default function SignUpScreen() {
   };
 
   const takePhoto = async () => {
+    setShowImagePickerModal(false);
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showModal(
         "Permission needed",
         "We need camera permissions to take a photo.",
       );
@@ -65,20 +78,15 @@ export default function SignUpScreen() {
     }
   };
 
-  const showImagePicker = () => {
-    Alert.alert("Select Profile Image", "Choose an option", [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Photo Library", onPress: pickImage },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
   const handleComplete = async () => {
     if (!name || !username) {
-      Alert.alert("Error", "Please fill in all fields");
+      showModal("Error", "Please fill in all fields");
+      return;
     }
 
     if (username.length < 3) {
-      Alert.alert("Error", "Username must be at least 3 characters");
+      showModal("Error", "Username must be at least 3 characters");
+      return;
     }
 
     setIsLoading(true);
@@ -92,10 +100,10 @@ export default function SignUpScreen() {
         .select("id")
         .eq("username", username)
         .neq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (existingUser) {
-        Alert.alert(
+        showModal(
           "Error",
           "This username is already taken. Please choose another one.",
         );
@@ -110,7 +118,7 @@ export default function SignUpScreen() {
           profileImageUrl = await uploadProfileImage(user.id, profileImage);
         } catch (error) {
           console.error("Error uploading profile image:", error);
-          Alert.alert(
+          showModal(
             "Warning",
             "Failed to upload profile image. Continuing without image.",
           );
@@ -126,7 +134,7 @@ export default function SignUpScreen() {
       });
       router.replace("/(tabs)");
     } catch (error) {
-      Alert.alert(
+      showModal(
         "Error",
         "Failed to complete the onboarding. Please try again.",
       );
@@ -135,6 +143,7 @@ export default function SignUpScreen() {
       setIsLoading(false);
     }
   };
+
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.container}>
       <View style={styles.content}>
@@ -148,7 +157,7 @@ export default function SignUpScreen() {
         <View style={styles.form}>
           <TouchableOpacity
             style={styles.imageContainer}
-            onPress={showImagePicker}
+            onPress={() => setShowImagePickerModal(true)}
           >
             {profileImage ? (
               <Image
@@ -194,6 +203,27 @@ export default function SignUpScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Info / error modal */}
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ""}
+        message={modal?.message ?? ""}
+        infoOnly
+        onCancel={hideModal}
+        onConfirm={hideModal}
+      />
+
+      {/* Image picker choice modal */}
+      <ConfirmModal
+        visible={showImagePickerModal}
+        title="Select Profile Image"
+        message="Choose how you'd like to add a photo."
+        confirmText="Camera"
+        cancelText="Photo Library"
+        onCancel={pickImage}
+        onConfirm={takePhoto}
+      />
     </SafeAreaView>
   );
 }
@@ -285,17 +315,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-  },
-  linkButton: {
-    marginTop: 24,
-    alignItems: "center",
-  },
-  linkButtonText: {
-    color: "#666",
-    fontSize: 14,
-  },
-  linkButtonTextBold: {
-    fontWeight: "600",
-    color: "#000",
   },
 });

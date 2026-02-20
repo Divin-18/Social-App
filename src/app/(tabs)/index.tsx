@@ -1,24 +1,24 @@
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import {
+    ActivityIndicator,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
-import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useState } from "react";
-import { Image } from "expo-image";
-import { Post, usePosts } from "@/hooks/usePosts";
+import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
+import { Post, usePosts } from "@/hooks/usePosts";
 import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PostCardProps {
   post: Post;
@@ -89,6 +89,17 @@ export default function Index() {
   const [isUploading, setIsUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Generic info/error modal
+  const [modal, setModal] = useState<{ title: string; message: string } | null>(
+    null,
+  );
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+  const hideModal = () => setModal(null);
+
+  // Image picker choice modal
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+
   const router = useRouter();
   const { createPost, posts, refreshPosts } = usePosts();
   const { user } = useAuth();
@@ -115,9 +126,10 @@ export default function Index() {
   };
 
   const pickImage = async () => {
+    setShowImagePickerModal(false);
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showModal(
         "Permission needed",
         "We need camera roll permissions to select a profile image.",
       );
@@ -138,9 +150,10 @@ export default function Index() {
   };
 
   const takePhoto = async () => {
+    setShowImagePickerModal(false);
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showModal(
         "Permission needed",
         "We need camera permissions to take a photo.",
       );
@@ -159,14 +172,6 @@ export default function Index() {
     }
   };
 
-  const showImagePicker = () => {
-    Alert.alert("Select Profile Image", "Choose an option", [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Photo Library", onPress: pickImage },
-      { text: "Cancel", style: "cancel" },
-    ]);
-  };
-
   const handlePost = async () => {
     if (!previewImage) return;
 
@@ -178,7 +183,7 @@ export default function Index() {
       setShowPreview(false);
     } catch (error) {
       console.error("Error creating post:", error);
-      Alert.alert("Error", "Failed to create post. Please try again.");
+      showModal("Error", "Failed to create post. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -204,7 +209,10 @@ export default function Index() {
         }
       />
 
-      <TouchableOpacity style={styles.fab} onPress={showImagePicker}>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowImagePickerModal(true)}
+      >
         <Text style={styles.fabText}>{hasActivePost ? "↻" : "+"}</Text>
       </TouchableOpacity>
 
@@ -261,6 +269,27 @@ export default function Index() {
           </View>
         </View>
       </Modal>
+
+      {/* Image picker choice modal */}
+      <ConfirmModal
+        visible={showImagePickerModal}
+        title="Select Image"
+        message="Choose how you'd like to add a photo."
+        confirmText="Camera"
+        cancelText="Photo Library"
+        onCancel={pickImage}
+        onConfirm={takePhoto}
+      />
+
+      {/* Info / error modal */}
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ""}
+        message={modal?.message ?? ""}
+        infoOnly
+        onCancel={hideModal}
+        onConfirm={hideModal}
+      />
     </SafeAreaView>
   );
 }
