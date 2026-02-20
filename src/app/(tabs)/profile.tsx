@@ -1,27 +1,31 @@
+import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
-import {
-  Text,
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { uploadProfileImage } from "@/lib/supabase/storage";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { uploadProfileImage } from "@/lib/supabase/storage";
-import { useState } from "react";
 import { useRouter } from "expo-router";
+import { useState } from "react";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Profile() {
   const { user, updateUser, signOut } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const router = useRouter();
 
   const handleUpdateProfileImage = async () => {
     if (!user) return;
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
     if (status !== "granted") {
       Alert.alert(
         "Permission needed",
@@ -36,6 +40,7 @@ export default function Profile() {
       aspect: [1, 1],
       quality: 0.8,
     });
+
     if (!result.canceled && result.assets[0]) {
       setIsUpdating(true);
       try {
@@ -58,21 +63,8 @@ export default function Profile() {
     }
   };
 
-  const handleSignOut = async () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          await signOut();
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
+  const handleSignOut = () => {
+    setShowSignOutModal(true);
   };
 
   return (
@@ -105,6 +97,7 @@ export default function Profile() {
               </View>
             </View>
           </TouchableOpacity>
+
           <Text style={styles.name}>{user?.name || "No Name"}</Text>
           <Text style={styles.username}>@{user?.username || "user"}</Text>
           <Text style={styles.email}>{user?.email}</Text>
@@ -155,11 +148,25 @@ export default function Profile() {
           >
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
+
           <TouchableOpacity style={[styles.settingItem, styles.deleteButton]}>
             <Text style={styles.deleteText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={showSignOutModal}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        confirmText="Sign Out"
+        onCancel={() => setShowSignOutModal(false)}
+        onConfirm={async () => {
+          setShowSignOutModal(false);
+          await signOut();
+          router.replace("/(auth)/login");
+        }}
+      />
     </SafeAreaView>
   );
 }
