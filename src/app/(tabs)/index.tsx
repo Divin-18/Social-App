@@ -1,14 +1,14 @@
 import * as ImagePicker from "expo-image-picker";
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import ConfirmModal from "@/components/ConfirmModal";
@@ -207,6 +207,7 @@ export default function Index() {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        style={{ width: "100%" }}
       />
 
       <TouchableOpacity
@@ -297,8 +298,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
   },
   fab: {
     position: "absolute",
