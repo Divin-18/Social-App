@@ -1,5 +1,4 @@
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { Ionicons } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   return (
@@ -12,6 +11,11 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={"person"} />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="setting">
+        <NativeTabs.Trigger.Label>Setting</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={"gear"} />
       </NativeTabs.Trigger>
     </NativeTabs>
   );
