@@ -1,6 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
-import { uploadPostImage } from "@/lib/supabase/storage";
 import { useEffect, useState } from "react";
 
 export interface PostUser {
@@ -25,10 +24,6 @@ export const usePosts = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-
-  useEffect(() => {
-    loadPosts();
-  }, []);
 
   const loadPosts = async () => {
     if (!user) return;
@@ -69,13 +64,17 @@ export const usePosts = () => {
     }
   };
 
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
   const createPost = async (imageUri: string, description?: string) => {
     if (!user) {
       throw new Error("User not authenticated");
     }
 
     try {
-      // Deactivate any existing posts
+      // 1️⃣ Deactivate any existing active posts
       const { error: deactivateError } = await supabase
         .from("posts")
         .update({ is_active: false })
@@ -86,30 +85,45 @@ export const usePosts = () => {
         console.error("Error deactivating old posts:", deactivateError);
       }
 
-      const imageUrl = await uploadPostImage(user.id, imageUri);
+      // 2️⃣ Upload image to Supabase Storage
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const fileName = `${user.id}-${Date.now()}.jpg`;
 
-      // Calculate expiration time
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const { error: uploadError } = await supabase.storage
+        .from("posts") // bucket name
+        .upload(fileName, blob, {
+          contentType: "image/jpeg",
+        });
 
-      const { error } = await supabase
-        .from("posts")
-        .insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          description: description || null,
-          expires_at: expiresAt.toISOString(),
-          is_active: true,
-        })
-        .select()
-        .single();
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
+
+      // 3️⃣ Get public URL
+      const { data } = supabase.storage.from("posts").getPublicUrl(fileName);
+
+      const imageUrl = data.publicUrl;
+
+      // 4️⃣ Calculate expiration time (24 hours)
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      // 5️⃣ Insert post into database
+      const { error } = await supabase.from("posts").insert({
+        user_id: user.id,
+        image_url: imageUrl,
+        description: description || null,
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      });
 
       if (error) {
         console.error("Error creating post:", error);
         throw error;
       }
 
-      // Refresh posts
+      // 6️⃣ Refresh posts
       await loadPosts();
     } catch (error) {
       console.error("Error in createPost:", error);
