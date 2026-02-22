@@ -5,8 +5,8 @@ import { uploadProfileImage } from "@/lib/supabase/storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -81,15 +81,16 @@ export default function Profile() {
     setShowSignOutModal(true);
   };
 
-  const fetchMyPosts = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  const fetchMyPosts = useCallback(async () => {
+    if (!user?.id) {
+      setPosts([]);
+      return;
+    }
 
     const { data, error } = await supabase
       .from("posts")
       .select("*")
-      .eq("user_id", user?.id)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -97,11 +98,13 @@ export default function Profile() {
     } else {
       setPosts(data);
     }
-  };
+  }, [user?.id]);
 
-  useEffect(() => {
-    fetchMyPosts();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyPosts();
+    }, [fetchMyPosts]),
+  );
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("posts").delete().eq("id", id);
@@ -109,6 +112,7 @@ export default function Profile() {
     if (error) {
       console.log("Delete error:", error.message);
     } else {
+      setMenuVisibleId(null);
       fetchMyPosts();
     }
   };

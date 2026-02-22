@@ -1,6 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export interface PostUser {
   id: string;
@@ -25,8 +25,12 @@ export const usePosts = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
-  const loadPosts = async () => {
-    if (!user) return;
+  const loadPosts = useCallback(async () => {
+    if (!user) {
+      setPosts([]);
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -62,13 +66,13 @@ export const usePosts = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [loadPosts]);
 
-  const createPost = async (imageUri: string, description?: string) => {
+  const createPost = useCallback(async (imageUri: string, description?: string) => {
     if (!user) {
       throw new Error("User not authenticated");
     }
@@ -129,11 +133,11 @@ export const usePosts = () => {
       console.error("Error in createPost:", error);
       throw error;
     }
-  };
+  }, [loadPosts, user]);
 
-  const refreshPosts = async () => {
+  const refreshPosts = useCallback(async () => {
     await loadPosts();
-  };
+  }, [loadPosts]);
 
-  return { createPost, posts, refreshPosts };
+  return { createPost, posts, refreshPosts, isLoading };
 };

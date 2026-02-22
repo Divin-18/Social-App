@@ -16,8 +16,8 @@ import { useAuth } from "@/context/AuthContext";
 import { Post, usePosts } from "@/hooks/usePosts";
 import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PostCardProps {
@@ -100,9 +100,14 @@ export default function Index() {
   // Image picker choice modal
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
 
-  const router = useRouter();
   const { createPost, posts, refreshPosts } = usePosts();
   const { user } = useAuth();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshPosts();
+    }, [refreshPosts]),
+  );
 
   // Check if user has an active post
   const userActivePost = posts.find(
