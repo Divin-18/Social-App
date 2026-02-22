@@ -1,11 +1,15 @@
 import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 import { uploadProfileImage } from "@/lib/supabase/storage";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Dimensions,
+  FlatList,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +17,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Post } from "./../../hooks/usePosts";
+const { width, height } = Dimensions.get("window");
+const ITEM_SIZE = (width - 500) / 3;
 
 export default function Profile() {
   const { user, updateUser, signOut } = useAuth();
@@ -24,9 +31,12 @@ export default function Profile() {
   const [modal, setModal] = useState<{ title: string; message: string } | null>(
     null,
   );
+  const [posts, setPosts] = useState<Post[]>([]);
   const showModal = (title: string, message: string) =>
     setModal({ title, message });
   const hideModal = () => setModal(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [menuVisibleId, setMenuVisibleId] = useState<string | null>(null);
 
   const handleUpdateProfileImage = async () => {
     if (!user) return;
@@ -71,6 +81,75 @@ export default function Profile() {
     setShowSignOutModal(true);
   };
 
+  const fetchMyPosts = async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("user_id", user?.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log(error);
+    } else {
+      setPosts(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyPosts();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("posts").delete().eq("id", id);
+
+    if (error) {
+      console.log("Delete error:", error.message);
+    } else {
+      fetchMyPosts();
+    }
+  };
+
+  const renderItem = ({ item }: { item: Post }) => (
+    <View style={styles.card}>
+      <TouchableOpacity onPress={() => setSelectedImage(item.image_url)}>
+        <Image source={{ uri: item.image_url }} style={styles.image} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.menuIcon}
+        onPress={() => setMenuVisibleId(item.id)}
+      >
+        <MaterialCommunityIcons name="dots-vertical" size={18} color="black" />
+      </TouchableOpacity>
+      {menuVisibleId === item.id && (
+        <View style={styles.menuBox}>
+          <TouchableOpacity onPress={() => handleDelete(item.id)}>
+            <Text style={styles.menuText}>Delete</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+          // onPress={() => handleRearrange(item.id)}
+          >
+            <Text style={styles.menuText}>Rearrange</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+          // onPress={() => handleHide(item.id)}
+          >
+            <Text style={styles.menuText}>Hide</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setMenuVisibleId(null)}>
+            <Text style={{ color: "red" }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -105,6 +184,18 @@ export default function Profile() {
           <Text style={styles.name}>{user?.name || "No Name"}</Text>
           <Text style={styles.username}>@{user?.username || "user"}</Text>
           <Text style={styles.email}>{user?.email}</Text>
+        </View>
+
+        <View style={styles.sectionPost}>
+          <Text style={styles.sectionTitle}>Posts</Text>
+
+          <FlatList
+            data={posts}
+            keyExtractor={(item) => item.id}
+            numColumns={7}
+            renderItem={renderItem}
+            columnWrapperStyle={{ justifyContent: "space-between" }}
+          />
         </View>
 
         <View style={styles.section}>
@@ -292,5 +383,38 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#ff3b30",
     fontWeight: "500",
+  },
+  card: {
+    position: "relative",
+  },
+  image: {
+    width: ITEM_SIZE,
+    height: ITEM_SIZE,
+    marginBottom: 6,
+    borderRadius: 8,
+  },
+  sectionPost: {
+    marginBottom: 32,
+  },
+  menuIcon: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    padding: 4,
+  },
+  menuBox: {
+    position: "absolute",
+    top: 40,
+    right: 10,
+    backgroundColor: "white",
+    borderRadius: 8,
+    padding: 10,
+    elevation: 5,
+  },
+  menuText: {
+    fontSize: 14,
+    marginBottom: 8,
   },
 });

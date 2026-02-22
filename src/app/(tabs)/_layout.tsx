@@ -12,11 +12,6 @@ export default function TabsLayout() {
         <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={"person"} />
       </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="setting">
-        <NativeTabs.Trigger.Label>Setting</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon sf={"gear"} />
-      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
