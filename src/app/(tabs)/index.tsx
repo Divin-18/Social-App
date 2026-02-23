@@ -15,6 +15,8 @@ import ConfirmModal from "@/components/ConfirmModal";
 import { useAuth } from "@/context/AuthContext";
 import { Post, usePosts } from "@/hooks/usePosts";
 import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
+import { supabase } from "@/lib/supabase/client";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
@@ -23,11 +25,37 @@ import { SafeAreaView } from "react-native-safe-area-context";
 interface PostCardProps {
   post: Post;
   currentUserId?: string;
+  refreshPosts: () => Promise<void>;
 }
 
-const PostCard = ({ post, currentUserId }: PostCardProps) => {
+const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
   const postUser = post.profiles;
   const isOwnPost = post.user_id === currentUserId;
+
+  const toggleLike = async () => {
+    if (!currentUserId) return;
+
+    const { data: existingLike } = await supabase
+      .from("likes")
+      .select("*")
+      .eq("post_id", post.id)
+      .eq("user_id", currentUserId);
+
+    if (existingLike && existingLike.length > 0) {
+      await supabase
+        .from("likes")
+        .delete()
+        .eq("post_id", post.id)
+        .eq("user_id", currentUserId);
+    } else {
+      await supabase.from("likes").insert({
+        post_id: post.id,
+        user_id: currentUserId,
+      });
+    }
+
+    await refreshPosts();
+  };
   return (
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
@@ -73,10 +101,26 @@ const PostCard = ({ post, currentUserId }: PostCardProps) => {
         {post.description && (
           <Text style={styles.postDescription}>{post.description}</Text>
         )}
-        <Text style={styles.postInfo}>
-          {isOwnPost ? "Your Post" : `${postUser?.name}' post`} • Expires in{" "}
-          {formatTimeRemaining(post.expires_at)}
-        </Text>
+
+        {/* ONE ROW CONTAINER */}
+        <View style={styles.footerRow}>
+          <Text style={styles.postInfo}>
+            {isOwnPost ? "Your Post" : `${postUser?.name}'s post`} • Expires in{" "}
+            {formatTimeRemaining(post.expires_at)}
+          </Text>
+
+          <View style={styles.iconRow}>
+            <TouchableOpacity onPress={toggleLike}>
+              <MaterialCommunityIcons
+                name={post.isLiked ? "heart" : "heart-outline"}
+                size={24}
+                color={post.isLiked ? "red" : "black"}
+              />
+            </TouchableOpacity>
+
+            <Text>{post.likeCount ?? 0}</Text>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -195,7 +239,11 @@ export default function Index() {
   };
 
   const renderPost = ({ item }: { item: Post }) => (
-    <PostCard post={item} currentUserId={user?.id} />
+    <PostCard
+      post={item}
+      currentUserId={user?.id}
+      refreshPosts={refreshPosts}
+    />
   );
 
   return (
@@ -468,6 +516,12 @@ const styles = StyleSheet.create({
   postFooter: {
     padding: 16,
   },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
   postDescription: {
     fontSize: 15,
     color: "#000",
@@ -477,5 +531,10 @@ const styles = StyleSheet.create({
   postInfo: {
     fontSize: 14,
     color: "#666",
+  },
+  iconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 });
