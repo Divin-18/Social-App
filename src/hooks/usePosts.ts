@@ -37,30 +37,35 @@ export const usePosts = () => {
     setIsLoading(true);
 
     try {
-      const { data: postsData, error } = await supabase
+      const { data, error } = await supabase
         .from("posts")
         .select(
           `
-          *,
-          profiles(id, name, username, profile_image_url),
-          likes(user_id)
-        `,
+        *,
+        profiles(id, name, username, profile_image_url),
+        likes(user_id),
+        hidden_posts!left(user_id)
+      `,
         )
         .eq("is_active", true)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Error loading posts:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      if (!postsData || postsData.length === 0) {
+      if (!data) {
         setPosts([]);
         return;
       }
 
-      const formattedPosts: Post[] = postsData.map((post: any) => ({
+      const visiblePosts = data.filter((post: any) => {
+        const isHidden = post.hidden_posts?.some(
+          (h: any) => h.user_id === user.id,
+        );
+        return !isHidden;
+      });
+
+      const formattedPosts: Post[] = visiblePosts.map((post: any) => ({
         ...post,
         profiles: post.profiles || null,
         likeCount: post.likes?.length ?? 0,

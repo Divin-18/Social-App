@@ -29,6 +29,7 @@ interface PostCardProps {
 }
 
 const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
+  const [menuVisible, setMenuVisible] = useState(false);
   const postUser = post.profiles;
   const isOwnPost = post.user_id === currentUserId;
 
@@ -54,6 +55,22 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
       });
     }
 
+    await refreshPosts();
+  };
+  const hidePost = async () => {
+    if (!currentUserId) return;
+
+    const { error } = await supabase.from("hidden_posts").insert({
+      post_id: post.id,
+      user_id: currentUserId,
+    });
+
+    if (error) {
+      console.log("Hide error:", error);
+      return;
+    }
+
+    setMenuVisible(false);
     await refreshPosts();
   };
   return (
@@ -83,10 +100,38 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
         </View>
 
         {/* Post content */}
-        <View style={styles.timeRemainingBadge}>
-          <Text style={styles.timeRemainingText}>
-            {formatTimeRemaining(post.expires_at)}
-          </Text>
+        <View style={styles.headerRight}>
+          <View style={styles.timeRemainingBadge}>
+            <Text style={styles.timeRemainingText}>
+              {formatTimeRemaining(post.expires_at)}
+            </Text>
+          </View>
+
+          <TouchableOpacity onPress={() => setMenuVisible(true)}>
+            <MaterialCommunityIcons
+              name="dots-vertical"
+              size={18}
+              color="black"
+            />
+          </TouchableOpacity>
+          <Modal
+            visible={menuVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setMenuVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.menuOverlay}
+              activeOpacity={1}
+              onPress={() => setMenuVisible(false)}
+            >
+              <View style={styles.dropdownMenu}>
+                <TouchableOpacity style={styles.menuItem} onPress={hidePost}>
+                  <Text style={styles.menuText}>Not Interested</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
         </View>
       </View>
 
@@ -536,5 +581,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  menuOverlay: {
+    flex: 1,
+  },
+
+  dropdownMenu: {
+    position: "absolute",
+    top: 80, // adjust depending on header height
+    right: 16, // align to right
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 8,
+    width: 170,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+
+  menuText: {
+    fontSize: 15,
+    color: "#000",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 });
