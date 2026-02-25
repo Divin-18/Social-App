@@ -1,4 +1,13 @@
+import ConfirmModal from "@/components/ConfirmModal";
+import { useAuth } from "@/context/AuthContext";
+import { Post, usePosts } from "@/hooks/usePosts";
+import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
+import { supabase } from "@/lib/supabase/client";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,16 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import ConfirmModal from "@/components/ConfirmModal";
-import { useAuth } from "@/context/AuthContext";
-import { Post, usePosts } from "@/hooks/usePosts";
-import { formatTimeAgo, formatTimeRemaining } from "@/lib/date-helper";
-import { supabase } from "@/lib/supabase/client";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Image } from "expo-image";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface PostCardProps {
@@ -28,58 +27,126 @@ interface PostCardProps {
   refreshPosts: () => Promise<void>;
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profiles?: {
+    username: string;
+    name: string;
+    profile_image_url: string;
+  };
+}
+
 const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [commentModalVisible, setCommentModalVisible] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+
   const postUser = post.profiles;
   const isOwnPost = post.user_id === currentUserId;
 
   const toggleLike = async () => {
     if (!currentUserId) return;
 
-    const { data: existingLike } = await supabase
-      .from("likes")
-      .select("*")
-      .eq("post_id", post.id)
-      .eq("user_id", currentUserId);
-
-    if (existingLike && existingLike.length > 0) {
-      await supabase
+    try {
+      const { data: existingLike } = await supabase
         .from("likes")
-        .delete()
+        .select("*")
         .eq("post_id", post.id)
         .eq("user_id", currentUserId);
-    } else {
-      await supabase.from("likes").insert({
+
+      if (existingLike && existingLike.length > 0) {
+        await supabase
+          .from("likes")
+          .delete()
+          .eq("post_id", post.id)
+          .eq("user_id", currentUserId);
+      } else {
+        await supabase.from("likes").insert({
+          post_id: post.id,
+          user_id: currentUserId,
+        });
+      }
+      await refreshPosts();
+    } catch (error) {
+      console.error("Error toggling like:", error);
+    }
+  };
+
+  const hidePost = async () => {
+    if (!currentUserId) return;
+    try {
+      const { error } = await supabase.from("hidden_posts").insert({
         post_id: post.id,
         user_id: currentUserId,
       });
+
+      if (error) {
+        console.log("Hide error:", error);
+        return;
+      }
+      setMenuVisible(false);
+      await refreshPosts();
+    } catch (error) {
+      console.error("Error hiding post:", error);
     }
-
-    await refreshPosts();
   };
-  const hidePost = async () => {
-    if (!currentUserId) return;
 
-    const { error } = await supabase.from("hidden_posts").insert({
-      post_id: post.id,
-      user_id: currentUserId,
-    });
+  const loadComments = async () => {
+    setIsLoadingComments(true);
+    try {
+      const { data, error } = await supabase
+        .from("comments")
+        .select(`*, profiles(name, username, profile_image_url)`)
+        .eq("post_id", post.id)
+        .order("created_at", { ascending: true });
 
-    if (error) {
-      console.log("Hide error:", error);
-      return;
+      if (!error) setComments(data || []);
+    } catch (error) {
+      console.error("Error loading comments:", error);
+    } finally {
+      setIsLoadingComments(false);
     }
-
-    setMenuVisible(false);
-    await refreshPosts();
   };
+
+  const addComment = async () => {
+    if (!currentUserId || !newComment.trim()) return;
+    try {
+      const { error } = await supabase.from("comments").insert({
+        post_id: post.id,
+        user_id: currentUserId,
+        content: newComment.trim(),
+      });
+
+      if (error) {
+        console.log("Comment error:", error);
+        return;
+      }
+
+      setNewComment("");
+      await loadComments();
+      await refreshPosts();
+    } catch (error) {
+      console.error("Error adding comment:", error);
+    }
+  };
+
+  const openComments = async () => {
+    await loadComments();
+    setCommentModalVisible(true);
+  };
+
   return (
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
           {postUser?.profile_image_url ? (
             <Image
-              cachePolicy={"none"}
+              // cachePolicy="memory-disc"
               source={{ uri: postUser.profile_image_url }}
               style={styles.avatar}
             />
@@ -90,7 +157,6 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
               </Text>
             </View>
           )}
-
           <View>
             <Text style={styles.username}>
               {isOwnPost ? "You" : `@${postUser?.username}`}
@@ -99,7 +165,6 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
           </View>
         </View>
 
-        {/* Post content */}
         <View style={styles.headerRight}>
           <View style={styles.timeRemainingBadge}>
             <Text style={styles.timeRemainingText}>
@@ -114,6 +179,7 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
               color="black"
             />
           </TouchableOpacity>
+
           <Modal
             visible={menuVisible}
             transparent
@@ -136,7 +202,7 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
       </View>
 
       <Image
-        cachePolicy={"none"}
+        // cachePolicy="memory-disc"
         source={{ uri: post.image_url }}
         style={styles.postImage}
         contentFit="cover"
@@ -147,7 +213,6 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
           <Text style={styles.postDescription}>{post.description}</Text>
         )}
 
-        {/* ONE ROW CONTAINER */}
         <View style={styles.footerRow}>
           <Text style={styles.postInfo}>
             {isOwnPost ? "Your Post" : `${postUser?.name}'s post`} • Expires in{" "}
@@ -155,18 +220,101 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
           </Text>
 
           <View style={styles.iconRow}>
-            <TouchableOpacity onPress={toggleLike}>
+            {/* ❤️ Like */}
+            <TouchableOpacity style={styles.iconItem} onPress={toggleLike}>
               <MaterialCommunityIcons
                 name={post.isLiked ? "heart" : "heart-outline"}
                 size={24}
                 color={post.isLiked ? "red" : "black"}
               />
+              <Text style={styles.iconText}>{post.likeCount ?? 0}</Text>
             </TouchableOpacity>
 
-            <Text>{post.likeCount ?? 0}</Text>
+            {/* 💬 Comment */}
+            <TouchableOpacity style={styles.iconItem} onPress={openComments}>
+              <MaterialCommunityIcons
+                name="comment-outline"
+                size={24}
+                color="black"
+              />
+              <Text style={styles.iconText}>{post.commentCount ?? 0}</Text>
+            </TouchableOpacity>
+
+            {/* 🔄 Share */}
+            <TouchableOpacity
+              style={styles.iconItem}
+              onPress={() => console.log("Share")}
+            >
+              <MaterialCommunityIcons
+                name="share-outline"
+                size={24}
+                color="black"
+              />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
+
+      {/* Comment Modal */}
+      <Modal
+        visible={commentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCommentModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.commentModalOverlay}
+          activeOpacity={1}
+          onPress={() => setCommentModalVisible(false)}
+        >
+          <View style={styles.commentModalContent}>
+            <View style={styles.commentModalHeader}>
+              <Text style={styles.commentModalTitle}>Comments</Text>
+              <TouchableOpacity onPress={() => setCommentModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={comments}
+              keyExtractor={(item) => item.id}
+              style={styles.commentsList}
+              renderItem={({ item }) => (
+                <View style={styles.commentItem}>
+                  <Text style={styles.commentUsername}>
+                    @{item.profiles?.username || "User"}
+                  </Text>
+                  <Text style={styles.commentText}>{item.content}</Text>
+                </View>
+              )}
+              ListEmptyComponent={
+                <Text style={styles.emptyComments}>No comments yet.</Text>
+              }
+            />
+
+            <View style={styles.commentInputRow}>
+              <TextInput
+                value={newComment}
+                onChangeText={setNewComment}
+                placeholder="Add a comment..."
+                style={styles.commentInput}
+                multiline
+              />
+              <TouchableOpacity
+                onPress={addComment}
+                disabled={!newComment.trim() || isLoadingComments}
+                style={styles.commentSendButton}
+              >
+                {isLoadingComments ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Text style={styles.commentSendText}>Post</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -174,19 +322,12 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
 export default function Index() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [description, setDescription] = useState<string>("");
+  const [description, setDescription] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Generic info/error modal
   const [modal, setModal] = useState<{ title: string; message: string } | null>(
     null,
   );
-  const showModal = (title: string, message: string) =>
-    setModal({ title, message });
-  const hideModal = () => setModal(null);
-
-  // Image picker choice modal
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
 
   const { createPost, posts, refreshPosts } = usePosts();
@@ -198,15 +339,18 @@ export default function Index() {
     }, [refreshPosts]),
   );
 
-  // Check if user has an active post
   const userActivePost = posts.find(
     (post) =>
       post.user_id === user?.id &&
       post.is_active &&
       new Date(post.expires_at) > new Date(),
   );
-
   const hasActivePost = !!userActivePost;
+
+  const showModal = (title: string, message: string) =>
+    setModal({ title, message });
+
+  const hideModal = () => setModal(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -219,8 +363,12 @@ export default function Index() {
     }
   };
 
-  const pickImage = async () => {
+  const handleImagePickerClose = () => {
     setShowImagePickerModal(false);
+  };
+
+  const pickImage = async () => {
+    handleImagePickerClose();
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       showModal(
@@ -229,7 +377,6 @@ export default function Index() {
       );
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
@@ -244,7 +391,7 @@ export default function Index() {
   };
 
   const takePhoto = async () => {
-    setShowImagePickerModal(false);
+    handleImagePickerClose();
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       showModal(
@@ -253,7 +400,6 @@ export default function Index() {
       );
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
@@ -268,7 +414,6 @@ export default function Index() {
 
   const handlePost = async () => {
     if (!previewImage) return;
-
     setIsUploading(true);
     try {
       await createPost(previewImage, description);
@@ -283,12 +428,15 @@ export default function Index() {
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <PostCard
-      post={item}
-      currentUserId={user?.id}
-      refreshPosts={refreshPosts}
-    />
+  const renderPost = useCallback(
+    ({ item }: { item: Post }) => (
+      <PostCard
+        post={item}
+        currentUserId={user?.id}
+        refreshPosts={refreshPosts}
+      />
+    ),
+    [user?.id, refreshPosts],
   );
 
   return (
@@ -301,7 +449,9 @@ export default function Index() {
         contentContainerStyle={
           posts.length === 0 ? styles.emptyContent : styles.content
         }
-        ListEmptyComponent={<Text>No posts found</Text>}
+        ListEmptyComponent={() => (
+          <Text style={styles.emptyText}>No posts found</Text>
+        )}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -315,16 +465,16 @@ export default function Index() {
         <Text style={styles.fabText}>{hasActivePost ? "↻" : "+"}</Text>
       </TouchableOpacity>
 
+      {/* Preview Modal */}
       <Modal visible={showPreview} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {" "}
               {hasActivePost ? "Replace Your Post" : "Preview Your Post"}
             </Text>
             {previewImage && (
               <Image
-                cachePolicy={"none"}
+                // cachePolicy="memory-disc"
                 source={{ uri: previewImage }}
                 style={styles.previewImage}
                 contentFit="cover"
@@ -396,6 +546,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f8f8f8",
   },
   fab: {
     position: "absolute",
@@ -412,6 +563,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 10,
   },
   fabText: {
     color: "#fff",
@@ -484,7 +636,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-
   content: {
     padding: 16,
     paddingBottom: 100,
@@ -495,7 +646,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
   },
-
+  emptyText: {
+    fontSize: 16,
+    color: "#666",
+  },
   postContainer: {
     backgroundColor: "#fff",
     borderRadius: 16,
@@ -580,33 +734,38 @@ const styles = StyleSheet.create({
   iconRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 24,
+  },
+  iconItem: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
+  },
+  iconText: {
+    fontSize: 14,
+    color: "#000",
   },
   menuOverlay: {
     flex: 1,
   },
-
   dropdownMenu: {
     position: "absolute",
-    top: 80, // adjust depending on header height
-    right: 16, // align to right
+    top: 40,
+    right: 0,
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingVertical: 8,
     width: 170,
-
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
   },
-
   menuItem: {
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-
   menuText: {
     fontSize: 15,
     color: "#000",
@@ -615,5 +774,80 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  commentModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  commentModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+    padding: 20,
+  },
+  commentModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  commentModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  commentsList: {
+    maxHeight: 300,
+  },
+  commentItem: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  commentUsername: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 4,
+  },
+  commentText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  emptyComments: {
+    textAlign: "center",
+    color: "#999",
+    marginVertical: 20,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  commentInput: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 80,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontSize: 14,
+  },
+  commentSendButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  commentSendText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000",
   },
 });

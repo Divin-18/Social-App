@@ -20,6 +20,7 @@ export interface Post {
   profiles?: PostUser | null;
   likeCount?: number;
   isLiked?: boolean;
+  commentCount?: number;
 }
 
 export const usePosts = () => {
@@ -70,6 +71,7 @@ export const usePosts = () => {
         profiles: post.profiles || null,
         likeCount: post.likes?.length ?? 0,
         isLiked: post.likes?.some((like: any) => like.user_id === user.id),
+        commentCount: post.comments?.length ?? 0,
       }));
 
       setPosts(formattedPosts);
