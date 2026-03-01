@@ -45,6 +45,7 @@ export const usePosts = () => {
         *,
         profiles(id, name, username, profile_image_url),
         likes(user_id),
+        comments(id),
         hidden_posts!left(user_id)
       `,
         )

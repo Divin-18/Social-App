@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -48,6 +48,10 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
 
   const postUser = post.profiles;
   const isOwnPost = post.user_id === currentUserId;
+
+  useEffect(() => {
+    loadComments();
+  }, [post.id]);
 
   const toggleLike = async () => {
     if (!currentUserId) return;
@@ -130,6 +134,7 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
       setNewComment("");
       await loadComments();
       await refreshPosts();
+      setCommentModalVisible(false);
     } catch (error) {
       console.error("Error adding comment:", error);
     }
@@ -253,6 +258,31 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {comments.length > 0 && (
+          <TouchableOpacity
+            style={styles.commentPreviewSection}
+            onPress={openComments}
+            activeOpacity={0.7}
+          >
+            {comments.slice(-2).map((c) => (
+              <View key={c.id} style={styles.commentPreviewRow}>
+                <Text style={styles.commentPreviewUsername}>
+                  @{c.profiles?.username || "User"}
+                </Text>
+                <Text style={styles.commentPreviewText} numberOfLines={1}>
+                  {" "}
+                  {c.content}
+                </Text>
+              </View>
+            ))}
+            {post.commentCount !== undefined && post.commentCount > 2 && (
+              <Text style={styles.viewAllComments}>
+                View all {post.commentCount} comments
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Comment Modal */}
@@ -262,11 +292,13 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
         animationType="slide"
         onRequestClose={() => setCommentModalVisible(false)}
       >
-        <TouchableOpacity
-          style={styles.commentModalOverlay}
-          activeOpacity={1}
-          onPress={() => setCommentModalVisible(false)}
-        >
+        <View style={styles.commentModalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            activeOpacity={1}
+            onPress={() => setCommentModalVisible(false)}
+          />
+
           <View style={styles.commentModalContent}>
             <View style={styles.commentModalHeader}>
               <Text style={styles.commentModalTitle}>Comments</Text>
@@ -313,7 +345,7 @@ const PostCard = ({ post, currentUserId, refreshPosts }: PostCardProps) => {
               </TouchableOpacity>
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </View>
   );
@@ -849,5 +881,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#000",
+  },
+  commentPreviewSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 4,
+  },
+  commentPreviewRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+  },
+  commentPreviewUsername: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#000",
+  },
+  commentPreviewText: {
+    fontSize: 13,
+    color: "#333",
+    flex: 1,
+  },
+  viewAllComments: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 2,
   },
 });
