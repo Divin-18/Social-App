@@ -1,10 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
 import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useState,
 } from "react";
 
 export interface User {
@@ -23,6 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,9 +158,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
   };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", user.id);
+      if (error) throw error;
+
+      await signOut();
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, signUp, updateUser, signIn, signOut, isLoading }}
+      value={{
+        user,
+        signUp,
+        updateUser,
+        signIn,
+        signOut,
+        deleteAccount,
+        isLoading,
+      }}
     >
       {children}
     </AuthContext.Provider>

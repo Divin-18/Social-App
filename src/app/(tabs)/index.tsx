@@ -7,7 +7,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -361,6 +361,7 @@ export default function Index() {
     null,
   );
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  const flatListRef = useRef<FlatList<Post>>(null);
 
   const { createPost, posts, refreshPosts } = usePosts();
   const { user } = useAuth();
@@ -452,6 +453,7 @@ export default function Index() {
       setPreviewImage(null);
       setDescription("");
       setShowPreview(false);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     } catch (error) {
       console.error("Error creating post:", error);
       showModal("Error", "Failed to create post. Please try again.");
@@ -475,6 +477,7 @@ export default function Index() {
     <SafeAreaView style={styles.container} edges={["bottom", "top"]}>
       {/* LIST */}
       <FlatList
+        ref={flatListRef}
         data={posts}
         renderItem={renderPost}
         keyExtractor={(item) => item.id}
@@ -494,16 +497,14 @@ export default function Index() {
         style={styles.fab}
         onPress={() => setShowImagePickerModal(true)}
       >
-        <Text style={styles.fabText}>{hasActivePost ? "↻" : "+"}</Text>
+        <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
       {/* Preview Modal */}
       <Modal visible={showPreview} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {hasActivePost ? "Replace Your Post" : "Preview Your Post"}
-            </Text>
+            <Text style={styles.modalTitle}>Preview Your Post</Text>
             {previewImage && (
               <Image
                 // cachePolicy="memory-disc"
@@ -541,9 +542,7 @@ export default function Index() {
                 {isUploading ? (
                   <ActivityIndicator size={24} color="#fff" />
                 ) : (
-                  <Text style={styles.postButtonText}>
-                    {hasActivePost ? "Replace" : "Post"}
-                  </Text>
+                  <Text style={styles.postButtonText}>Post</Text>
                 )}
               </TouchableOpacity>
             </View>

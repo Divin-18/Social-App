@@ -94,12 +94,6 @@ export const usePosts = () => {
       }
 
       try {
-        await supabase
-          .from("posts")
-          .update({ is_active: false })
-          .eq("user_id", user.id)
-          .eq("is_active", true);
-
         const response = await fetch(imageUri);
         const blob = await response.blob();
         const fileName = `${user.id}-${Date.now()}.jpg`;

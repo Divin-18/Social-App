@@ -22,9 +22,10 @@ const { width, height } = Dimensions.get("window");
 const ITEM_SIZE = (width - 500) / 3;
 
 export default function Profile() {
-  const { user, updateUser, signOut } = useAuth();
+  const { user, updateUser, signOut, deleteAccount } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const router = useRouter();
 
   // Generic info/error modal
@@ -79,6 +80,10 @@ export default function Profile() {
 
   const handleSignOut = () => {
     setShowSignOutModal(true);
+  };
+
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
   };
 
   const fetchMyPosts = useCallback(async () => {
@@ -248,7 +253,10 @@ export default function Profile() {
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.settingItem, styles.deleteButton]}>
+          <TouchableOpacity
+            style={[styles.settingItem, styles.deleteButton]}
+            onPress={handleDeleteAccount}
+          >
             <Text style={styles.deleteText}>Delete Account</Text>
           </TouchableOpacity>
         </View>
@@ -268,7 +276,23 @@ export default function Profile() {
         }}
       />
 
-      {/* Info / error modal */}
+      <ConfirmModal
+        visible={showDeleteModal}
+        title="Delete Account"
+        message="Are you sure you want to delete your account? This action cannot be undone."
+        confirmText="Delete"
+        onCancel={() => setShowDeleteModal(false)}
+        onConfirm={async () => {
+          setShowDeleteModal(false);
+          try {
+            await deleteAccount();
+            router.replace("/(auth)/login");
+          } catch (error) {
+            console.error("Error deleting account:", error);
+            showModal("Error", "Failed to delete account. Please try again.");
+          }
+        }}
+      />
       <ConfirmModal
         visible={!!modal}
         title={modal?.title ?? ""}
