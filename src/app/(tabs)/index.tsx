@@ -9,15 +9,15 @@ import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Modal,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -363,7 +363,12 @@ export default function Index() {
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   const flatListRef = useRef<FlatList<Post>>(null);
 
-  const { createPost, posts, refreshPosts } = usePosts();
+  const {
+    createPost,
+    posts,
+    refreshPosts,
+    isLoading: isLoadingPosts,
+  } = usePosts();
   const { user } = useAuth();
 
   useFocusEffect(
@@ -476,22 +481,31 @@ export default function Index() {
   return (
     <SafeAreaView style={styles.container} edges={["bottom", "top"]}>
       {/* LIST */}
-      <FlatList
-        ref={flatListRef}
-        data={posts}
-        renderItem={renderPost}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={
-          posts.length === 0 ? styles.emptyContent : styles.content
-        }
-        ListEmptyComponent={() => (
-          <Text style={styles.emptyText}>No posts found</Text>
-        )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        style={{ width: "100%" }}
-      />
+      {isLoadingPosts && posts.length === 0 ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#000" />
+          <Text style={styles.loaderText}>Loading posts...</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={
+            posts.length === 0 ? styles.emptyContent : styles.content
+          }
+          ListEmptyComponent={() => (
+            <Text style={styles.emptyText}>
+              No posts yet. Be the first to share!
+            </Text>
+          )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          style={{ width: "100%" }}
+        />
+      )}
 
       <TouchableOpacity
         style={styles.fab}
@@ -578,6 +592,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f8f8",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+  loaderText: {
+    fontSize: 14,
+    color: "#999",
   },
   fab: {
     position: "absolute",

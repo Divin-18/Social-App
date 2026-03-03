@@ -8,6 +8,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   ScrollView,
@@ -22,8 +23,9 @@ const { width, height } = Dimensions.get("window");
 const ITEM_SIZE = (width - 500) / 3;
 
 export default function Profile() {
-  const { user, updateUser, signOut, deleteAccount } = useAuth();
+  const { user, updateUser, signOut, deleteAccount, isLoading } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const router = useRouter();
@@ -89,9 +91,11 @@ export default function Profile() {
   const fetchMyPosts = useCallback(async () => {
     if (!user?.id) {
       setPosts([]);
+      setIsLoadingPosts(false);
       return;
     }
 
+    setIsLoadingPosts(true);
     const { data, error } = await supabase
       .from("posts")
       .select("*")
@@ -103,6 +107,7 @@ export default function Profile() {
     } else {
       setPosts(data);
     }
+    setIsLoadingPosts(false);
   }, [user?.id]);
 
   useFocusEffect(
@@ -159,6 +164,16 @@ export default function Profile() {
     </View>
   );
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#000" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -184,8 +199,16 @@ export default function Profile() {
                 </View>
               )}
 
+              {isUpdating && (
+                <View style={styles.profileImageOverlay}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
+
               <View style={styles.editBadge}>
-                <Text style={styles.editBadgeText}>Edit</Text>
+                <Text style={styles.editBadgeText}>
+                  {isUpdating ? "Uploading..." : "Edit"}
+                </Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -198,13 +221,24 @@ export default function Profile() {
         <View style={styles.sectionPost}>
           <Text style={styles.sectionTitle}>Posts</Text>
 
-          <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            numColumns={7}
-            renderItem={renderItem}
-            columnWrapperStyle={{ justifyContent: "space-between" }}
-          />
+          {isLoadingPosts ? (
+            <View style={styles.postsLoaderContainer}>
+              <ActivityIndicator size="small" color="#000" />
+              <Text style={styles.postsLoaderText}>Loading posts...</Text>
+            </View>
+          ) : posts.length === 0 ? (
+            <View style={styles.postsLoaderContainer}>
+              <Text style={styles.postsEmptyText}>No posts yet</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={posts}
+              keyExtractor={(item) => item.id}
+              numColumns={7}
+              renderItem={renderItem}
+              columnWrapperStyle={{ justifyContent: "space-between" }}
+            />
+          )}
         </View>
 
         <View style={styles.section}>
@@ -309,6 +343,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  postsLoaderContainer: {
+    paddingVertical: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  postsLoaderText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#999",
+  },
+  postsEmptyText: {
+    fontSize: 14,
+    color: "#999",
   },
   content: {
     padding: 32,
